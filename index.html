@@ -299,13 +299,13 @@
 
 <script>
 "use strict";
-const APP_VER = "1.6";   // 更新のたびに上げる（設定タブ最下部に表示）
+const APP_VER = "1.7";   // 更新のたびに上げる（設定タブ最下部に表示）
 /* ================= データ保存 ================= */
 const LS_LOGS = "kt_logs", LS_SET = "kt_settings", LS_UI = "kt_ui";
 const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
 let logs = load(LS_LOGS, []);                      // 全セット記録 [{ts,d,ex,w,r}]
 let S = Object.assign(
-  {sound:"beep", vol:0.7, autoTimer:true, rest:90, exercises:DEFAULT_EX.slice()},
+  {sound:"beep", vol:0.7, autoTimer:true, rest:150, exercises:DEFAULT_EX.slice()},
   load(LS_SET, {})
 );
 function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
@@ -512,7 +512,7 @@ let wakeLock = null;
 function fmtSec(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
 function renderPresets(){
   const el = document.getElementById("presets");
-  el.innerHTML = [30,60,90,120,180].map(s=>
+  el.innerHTML = [30,60,90,120,150,180].map(s=>
     `<button class="${s===tTotal?"sel":""}" onclick="setTimerTo(${s})">${fmtSec(s)}</button>`).join("");
 }
 function drawTimer(){
