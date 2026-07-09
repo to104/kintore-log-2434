@@ -285,6 +285,7 @@
       <button class="danger big" onclick="wipeAll()">全データを削除</button>
       <div class="note">記録はこの端末のブラウザ内に保存されます。念のため月1回程度バックアップ（保存）をおすすめします。</div>
     </div>
+    <div class="note" style="text-align:center" id="verDisp"></div>
   </section>
 
 </main>
@@ -298,6 +299,7 @@
 
 <script>
 "use strict";
+const APP_VER = "1.4";   // 更新のたびに上げる（設定タブ最下部に表示）
 /* ================= データ保存 ================= */
 const LS_LOGS = "kt_logs", LS_SET = "kt_settings";
 const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
@@ -704,12 +706,24 @@ function initUI(){
   renderExSelect(); prefillLast(); renderDateBtn(); renderToday();
   tTotal = tRemain = S.rest; renderPresets(); drawTimer();
   renderSettings();
+  document.getElementById("verDisp").textContent = `筋トレ記録 v${APP_VER}`;
 }
 initUI();
 
 /* ================= オフライン対応（Service Worker登録） ================= */
 if("serviceWorker" in navigator && location.protocol==="https:"){
-  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  const hadController = !!navigator.serviceWorker.controller;   // 初回インストール時の誤リロード防止
+  let refreshing = false;
+  // 新バージョンが有効になったら自動で再読み込みして反映（タイマー動作中は次回起動時に持ち越し）
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(refreshing || !hadController || tRunning) return;
+    refreshing = true;
+    showToast("新しいバージョンに更新します…");
+    setTimeout(()=> location.reload(), 800);
+  });
+  navigator.serviceWorker.register("./sw.js")
+    .then(reg => reg.update().catch(()=>{}))    // 起動のたびに更新チェック
+    .catch(()=>{});
 }
 </script>
 </body>
