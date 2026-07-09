@@ -299,7 +299,7 @@
 
 <script>
 "use strict";
-const APP_VER = "1.8";   // 更新のたびに上げる（設定タブ最下部に表示）
+const APP_VER = "1.9";   // 更新のたびに上げる（設定タブ最下部に表示）
 /* ================= データ保存 ================= */
 const LS_LOGS = "kt_logs", LS_SET = "kt_settings", LS_UI = "kt_ui";
 const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
@@ -600,8 +600,8 @@ function renderHistory(){
     byDay[d].forEach(l=>{ (groups[l.ex]=groups[l.ex]||[]).push(l); });
     return `<div class="daygroup"><div class="day">${d}</div>
       ${Object.entries(groups).map(([ex,sets])=>`
-        <div class="setrow"><span class="val">${esc(ex)}</span>
-          <span style="color:var(--sub);font-size:13px">${sets.map(s=>(s.w>0?s.w+"kg":"自重")+"×"+s.r).join("　")}</span>
+        <div class="setrow"><span class="val" style="flex:none">${esc(ex)}</span>
+          <span style="flex:1; min-width:0; text-align:right; color:var(--sub);font-size:13px">${sets.map(s=>(s.w>0?s.w+"kg":"自重")+"×"+s.r).join("　")}</span>
         </div>`).join("")}
     </div>`;
   }).join("");
