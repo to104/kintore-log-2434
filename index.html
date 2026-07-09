@@ -299,9 +299,9 @@
 
 <script>
 "use strict";
-const APP_VER = "1.5";   // 更新のたびに上げる（設定タブ最下部に表示）
+const APP_VER = "1.6";   // 更新のたびに上げる（設定タブ最下部に表示）
 /* ================= データ保存 ================= */
-const LS_LOGS = "kt_logs", LS_SET = "kt_settings";
+const LS_LOGS = "kt_logs", LS_SET = "kt_settings", LS_UI = "kt_ui";
 const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
 let logs = load(LS_LOGS, []);                      // 全セット記録 [{ts,d,ex,w,r}]
 let S = Object.assign(
@@ -311,6 +311,13 @@ let S = Object.assign(
 function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
 function saveLogs(){ localStorage.setItem(LS_LOGS, JSON.stringify(logs)); }
 function saveSet(){ localStorage.setItem(LS_SET, JSON.stringify(S)); }
+// 画面の状態（入力中の種目・重量・回数、タイマーの時間）を保存。次回起動時に復元する
+function saveUI(){
+  localStorage.setItem(LS_UI, JSON.stringify({
+    ex: exSelect.value, w: inW.value, r: inR.value,
+    tTotal, tRemain, tRunning, tEndAt
+  }));
+}
 function fmtDate(ts){ const d=new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function fmtTime(ts){ const d=new Date(ts); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
 
@@ -436,16 +443,20 @@ document.getElementById("calModal").addEventListener("click", e => {
 });
 
 /* ================= 記録タブ ================= */
-function stepW(d){ const el=inW; el.value = Math.max(0, (parseFloat(el.value)||0)+d); }
-function stepR(d){ const el=inR; el.value = Math.max(1, (parseInt(el.value)||0)+d); }
+function stepW(d){ const el=inW; el.value = Math.max(0, (parseFloat(el.value)||0)+d); saveUI(); }
+function stepR(d){ const el=inR; el.value = Math.max(1, (parseInt(el.value)||0)+d); saveUI(); }
 const inW = document.getElementById("inW"), inR = document.getElementById("inR");
 const exSelect = document.getElementById("exSelect");
+// 手入力（キーボード入力）でも保存
+inW.addEventListener("input", saveUI);
+inR.addEventListener("input", saveUI);
 
 function renderExSelect(){
   exSelect.innerHTML = S.exercises.map(e=>`<option>${esc(e)}</option>`).join("");
 }
 // 種目を切り替えたら、その種目の前回の重量・回数を自動入力
 exSelect.addEventListener("change", prefillLast);
+exSelect.addEventListener("change", saveUI);   // 切り替え後の状態も保存（登録順に実行される）
 function prefillLast(){
   const ex = exSelect.value;
   for(let i=logs.length-1; i>=0; i--){
@@ -511,12 +522,12 @@ function drawTimer(){
   document.getElementById("ringFg").style.strokeDashoffset = RING_LEN*(1-ratio);
   document.getElementById("btnStart").textContent = tRunning ? "一時停止" : "スタート";
 }
-function setTimerTo(sec){ tTotal = tRemain = sec; stopTicking(); tRunning=false; renderPresets(); drawTimer(); }
+function setTimerTo(sec){ tTotal = tRemain = sec; stopTicking(); tRunning=false; renderPresets(); drawTimer(); saveUI(); }
 function adjustTimer(d){
   tTotal = Math.max(30, tTotal + d);
   tRemain = tRunning ? Math.max(0, tRemain + d) : tTotal;
   if(tRunning) tEndAt = Date.now() + tRemain*1000;
-  renderPresets(); drawTimer();
+  renderPresets(); drawTimer(); saveUI();
 }
 function toggleTimer(){
   ac();                                   // ユーザー操作時に音の準備（iOSの制約対策）
@@ -528,9 +539,9 @@ function toggleTimer(){
     tInterval = setInterval(tick, 200);
     requestWake();
   }
-  drawTimer();
+  drawTimer(); saveUI();
 }
-function resetTimer(){ stopTicking(); tRunning=false; tTotal = S.rest; tRemain = tTotal; renderPresets(); drawTimer(); }
+function resetTimer(){ stopTicking(); tRunning=false; tTotal = S.rest; tRemain = tTotal; renderPresets(); drawTimer(); saveUI(); }
 function stopTicking(){ if(tInterval){ clearInterval(tInterval); tInterval=null; } releaseWake(); }
 function tick(){
   tRemain = Math.max(0, Math.round((tEndAt-Date.now())/1000));
@@ -539,7 +550,7 @@ function tick(){
     if(tRemain>0 && tRemain<=3) playTick();     // 残り3秒からカウント音
   }
   drawTimer();
-  if(tRemain<=0){ stopTicking(); tRunning=false; playFinishSound(); drawTimer(); }
+  if(tRemain<=0){ stopTicking(); tRunning=false; playFinishSound(); drawTimer(); saveUI(); }
 }
 // 画面消灯防止（Wake Lock。iOS 16.4以降のSafariで有効）
 async function requestWake(){ try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){} }
@@ -652,7 +663,7 @@ function importJSON(input){
 function wipeAll(){
   if(!confirm("すべての記録と設定を削除します。よろしいですか？")) return;
   if(!confirm("本当に削除しますか？（元に戻せません）")) return;
-  localStorage.removeItem(LS_LOGS); localStorage.removeItem(LS_SET);
+  localStorage.removeItem(LS_LOGS); localStorage.removeItem(LS_SET); localStorage.removeItem(LS_UI);
   location.reload();
 }
 
@@ -682,7 +693,7 @@ document.getElementById("autoTimerChk").addEventListener("change", e=>{
 });
 function stepRest(d){
   S.rest = Math.max(30, S.rest+d); saveSet();
-  if(!tRunning){ tTotal=tRemain=S.rest; renderPresets(); drawTimer(); }
+  if(!tRunning){ tTotal=tRemain=S.rest; renderPresets(); drawTimer(); saveUI(); }
   renderSettings();
 }
 function addExercise(){
@@ -703,12 +714,33 @@ function initUI(){
   const now = new Date();
   document.getElementById("hdDate").textContent =
     `${now.getMonth()+1}/${now.getDate()}（${"日月火水木金土"[now.getDay()]}）`;
-  renderExSelect(); prefillLast(); renderDateBtn(); renderToday();
-  tTotal = tRemain = S.rest; renderPresets(); drawTimer();
+  const ui = load(LS_UI, null);                // 前回終了時の画面状態
+  renderExSelect();
+  if(ui && S.exercises.includes(ui.ex)){       // 前回の種目・重量・回数を復元
+    exSelect.value = ui.ex;
+    inW.value = ui.w; inR.value = ui.r;
+  }else prefillLast();
+  renderDateBtn(); renderToday();
+  // タイマーの復元：前回の選択時間・残り時間をそのまま表示
+  tTotal = (ui && ui.tTotal >= 30) ? ui.tTotal : S.rest;
+  stopTicking(); tRunning = false;
+  if(ui && ui.tRunning){
+    const rem = Math.round((ui.tEndAt - Date.now())/1000);
+    if(rem > 0){                               // カウント中に閉じた場合：続きから再開
+      tRemain = rem; tEndAt = ui.tEndAt; tRunning = true; lastSec = rem;
+      tInterval = setInterval(tick, 200); requestWake();
+    }else tRemain = 0;                         // 閉じている間に終了：0:00で停止表示（音は鳴らさない）
+  }else{
+    tRemain = (ui && typeof ui.tRemain === "number") ? Math.min(Math.max(0, ui.tRemain), tTotal) : tTotal;
+  }
+  renderPresets(); drawTimer();
   renderSettings();
   document.getElementById("verDisp").textContent = `筋トレ記録 v${APP_VER}`;
 }
 initUI();
+// アプリを閉じる・切り替える瞬間にも状態を保存（保存漏れ防止）
+window.addEventListener("pagehide", saveUI);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") saveUI(); });
 
 /* ================= オフライン対応（Service Worker登録） ================= */
 if("serviceWorker" in navigator && location.protocol==="https:"){
