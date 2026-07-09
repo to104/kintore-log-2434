@@ -54,6 +54,30 @@
   .setrow .val{flex:1; font-weight:600;}
   .setrow .del{background:none; border:none; color:var(--sub); font-size:18px; padding:2px 8px;}
   .empty{color:var(--sub); font-size:14px; text-align:center; padding:14px 0;}
+  /* ---- 日付選択バー・カレンダー ---- */
+  .datebar{display:flex; gap:8px; margin-bottom:4px;}
+  .datebar button{flex:0 0 52px;}
+  .datebar .datebtn{flex:1; font-size:17px;}
+  .datebar .datebtn.past{color:var(--amber); border-color:var(--amber);}
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.65); display:none;
+    align-items:center; justify-content:center; z-index:40;}
+  .modal.open{display:flex;}
+  .calbox{background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:16px; width:92%; max-width:360px;}
+  .calhead{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .calhead span{font-weight:700; font-size:17px;}
+  .calhead button{padding:8px 16px;}
+  .calgrid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:12px;}
+  .calgrid .wd{text-align:center; font-size:11px; color:var(--sub); padding:4px 0;}
+  .calgrid .day{position:relative; aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    border-radius:10px; font-size:15px; background:var(--card2); border:1px solid transparent; padding:0;}
+  .calgrid .day.blank{background:none; border:none; pointer-events:none;}
+  .calgrid .day.today{border-color:var(--sub);}
+  .calgrid .day.sel{border-color:var(--accent); color:var(--accent); font-weight:700;}
+  .calgrid .day.sun{color:var(--red);}
+  .calgrid .day.sat{color:var(--accent);}
+  .calgrid .day .dot{position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
+    width:5px; height:5px; border-radius:50%; background:var(--green);}
   /* ---- タイマー ---- */
   .timer-wrap{display:flex; flex-direction:column; align-items:center; padding:8px 0;}
   .ring{position:relative; width:240px; height:240px;}
@@ -110,6 +134,14 @@
   <!-- ========== 記録タブ ========== -->
   <section id="tab-log" class="active">
     <div class="card">
+      <h2>記録する日</h2>
+      <div class="datebar">
+        <button onclick="shiftDay(-1)">◀</button>
+        <button class="datebtn" id="dateBtn" onclick="openCal()">今日</button>
+        <button onclick="shiftDay(1)">▶</button>
+      </div>
+    </div>
+    <div class="card">
       <h2>セットを記録</h2>
       <label class="field">種目</label>
       <select id="exSelect"></select>
@@ -130,10 +162,26 @@
       <div class="note" id="autoTimerNote"></div>
     </div>
     <div class="card">
-      <h2>今日の記録</h2>
+      <h2 id="todayHead">今日の記録</h2>
       <div id="todayList"></div>
     </div>
   </section>
+
+  <!-- カレンダー（日付選択） -->
+  <div class="modal" id="calModal">
+    <div class="calbox">
+      <div class="calhead">
+        <button onclick="calMove(-1)">◀</button>
+        <span id="calTitle"></span>
+        <button onclick="calMove(1)">▶</button>
+      </div>
+      <div class="calgrid" id="calGrid"></div>
+      <div class="row">
+        <button onclick="selectDate(fmtDate(Date.now()))">今日へ戻る</button>
+        <button onclick="closeCal()">閉じる</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ========== タイマータブ ========== -->
   <section id="tab-timer">
@@ -297,6 +345,64 @@ function playFinishSound(){
 }
 function playTick(){ tone(1000, 0, 0.06, "sine", .4); }
 
+/* ================= 記録する日（カレンダー） ================= */
+let selDate = fmtDate(Date.now());          // 記録対象の日付
+let calY = 0, calM = 0;                      // カレンダー表示中の年・月
+const WD = ["日","月","火","水","木","金","土"];
+
+function isToday(d){ return d === fmtDate(Date.now()); }
+function renderDateBtn(){
+  const btn = document.getElementById("dateBtn");
+  const dt = new Date(selDate + "T12:00:00");
+  btn.textContent = isToday(selDate)
+    ? `今日（${dt.getMonth()+1}/${dt.getDate()} ${WD[dt.getDay()]}）`
+    : `${dt.getFullYear()}/${dt.getMonth()+1}/${dt.getDate()}（${WD[dt.getDay()]}）`;
+  btn.classList.toggle("past", !isToday(selDate));   // 今日以外は色を変えて注意喚起
+  document.getElementById("todayHead").textContent =
+    isToday(selDate) ? "今日の記録" : `${dt.getMonth()+1}/${dt.getDate()} の記録`;
+}
+function selectDate(d){
+  selDate = d; closeCal(); renderDateBtn(); renderToday();
+}
+function shiftDay(n){
+  const dt = new Date(selDate + "T12:00:00");
+  dt.setDate(dt.getDate() + n);
+  selectDate(fmtDate(dt.getTime()));
+}
+function openCal(){
+  const dt = new Date(selDate + "T12:00:00");
+  calY = dt.getFullYear(); calM = dt.getMonth();
+  renderCal();
+  document.getElementById("calModal").classList.add("open");
+}
+function closeCal(){ document.getElementById("calModal").classList.remove("open"); }
+function calMove(n){
+  calM += n;
+  if(calM < 0){ calM = 11; calY--; }
+  if(calM > 11){ calM = 0; calY++; }
+  renderCal();
+}
+function renderCal(){
+  document.getElementById("calTitle").textContent = `${calY}年${calM+1}月`;
+  const hasLog = new Set(logs.map(l => l.d));            // 記録がある日に緑の点を付ける
+  const first = new Date(calY, calM, 1).getDay();
+  const days = new Date(calY, calM+1, 0).getDate();
+  let html = WD.map(w => `<div class="wd">${w}</div>`).join("");
+  for(let i=0; i<first; i++) html += `<div class="day blank"></div>`;
+  for(let d=1; d<=days; d++){
+    const ds = `${calY}-${String(calM+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const wd = (first + d - 1) % 7;
+    const cls = ["day", wd===0?"sun":"", wd===6?"sat":"",
+                 isToday(ds)?"today":"", ds===selDate?"sel":""].filter(Boolean).join(" ");
+    html += `<button class="${cls}" onclick="selectDate('${ds}')">${d}${hasLog.has(ds)?'<span class="dot"></span>':""}</button>`;
+  }
+  document.getElementById("calGrid").innerHTML = html;
+}
+// カレンダーの背景タップで閉じる
+document.getElementById("calModal").addEventListener("click", e => {
+  if(e.target.id === "calModal") closeCal();
+});
+
 /* ================= 記録タブ ================= */
 function stepW(d){ const el=inW; el.value = Math.max(0, (parseFloat(el.value)||0)+d); }
 function stepR(d){ const el=inR; el.value = Math.max(1, (parseInt(el.value)||0)+d); }
@@ -319,19 +425,25 @@ function addSet(){
   if(!ex) return alert("種目を選択してください");
   const w = parseFloat(inW.value)||0, r = parseInt(inR.value)||0;
   if(r<1) return alert("回数を入力してください");
-  logs.push({ts:Date.now(), d:fmtDate(Date.now()), ex, w, r});
+  let ts = Date.now();
+  if(!isToday(selDate)){                       // 過去日への記録：その日の日付＋現在時刻で保存
+    const n = new Date(), dt = new Date(selDate + "T00:00:00");
+    dt.setHours(n.getHours(), n.getMinutes(), n.getSeconds(), n.getMilliseconds());
+    ts = dt.getTime();
+  }
+  logs.push({ts, d:selDate, ex, w, r});
   saveLogs(); renderToday();
-  if(S.autoTimer){ showTab("timer"); resetTimer(); toggleTimer(); }   // 自動で休憩タイマー開始
+  // 休憩タイマーの自動開始は「今日」への記録時のみ（過去日の入力時は不要）
+  if(S.autoTimer && isToday(selDate)){ showTab("timer"); resetTimer(); toggleTimer(); }
 }
 function delLog(ts){
   logs = logs.filter(l=> l.ts!==ts);
   saveLogs(); renderToday(); renderHistory();
 }
 function renderToday(){
-  const today = fmtDate(Date.now());
-  const list = logs.filter(l=> l.d===today);
+  const list = logs.filter(l=> l.d===selDate);
   const el = document.getElementById("todayList");
-  if(!list.length){ el.innerHTML = `<div class="empty">まだ記録がありません</div>`; return; }
+  if(!list.length){ el.innerHTML = `<div class="empty">この日の記録はありません</div>`; return; }
   const groups = {};
   list.forEach(l=>{ (groups[l.ex] = groups[l.ex]||[]).push(l); });
   el.innerHTML = Object.entries(groups).map(([ex,sets])=>`
@@ -554,7 +666,7 @@ function initUI(){
   const now = new Date();
   document.getElementById("hdDate").textContent =
     `${now.getMonth()+1}/${now.getDate()}（${"日月火水木金土"[now.getDay()]}）`;
-  renderExSelect(); prefillLast(); renderToday();
+  renderExSelect(); prefillLast(); renderDateBtn(); renderToday();
   tTotal = tRemain = S.rest; renderPresets(); drawTimer();
   renderSettings();
 }
