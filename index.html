@@ -549,8 +549,10 @@ document.addEventListener("visibilitychange", ()=>{
 /* ================= 履歴・集計 ================= */
 const histEx = document.getElementById("histEx");
 function renderHistExOptions(){
+  const cur = histEx.value;                    // 選択中の種目を保持（リスト再生成でリセットされるのを防ぐ）
   const used = [...new Set(logs.map(l=>l.ex))];
   histEx.innerHTML = `<option value="">すべての種目</option>` + used.map(e=>`<option>${esc(e)}</option>`).join("");
+  if(used.includes(cur)) histEx.value = cur;
 }
 function renderHistory(){
   renderHistExOptions();
