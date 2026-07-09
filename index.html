@@ -299,7 +299,7 @@
 
 <script>
 "use strict";
-const APP_VER = "1.7";   // 更新のたびに上げる（設定タブ最下部に表示）
+const APP_VER = "1.8";   // 更新のたびに上げる（設定タブ最下部に表示）
 /* ================= データ保存 ================= */
 const LS_LOGS = "kt_logs", LS_SET = "kt_settings", LS_UI = "kt_ui";
 const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
@@ -332,12 +332,20 @@ function showTab(name){
 }
 
 /* ================= 音（Web Audio APIで合成） ================= */
-let AC = null;
+let AC = null, COMP = null;
 function ac(){
-  if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
-  if(AC.state==="suspended") AC.resume();
+  if(!AC){
+    AC = new (window.AudioContext||window.webkitAudioContext)();
+    COMP = AC.createDynamicsCompressor();   // 音割れ防止（大きい音を自動で抑える）
+    COMP.connect(AC.destination);
+  }
+  // "suspended"（一時停止）だけでなくiOSの"interrupted"（電話・Siriによる中断）からも復帰させる
+  if(AC.state!=="running") AC.resume().catch(()=>{});
   return AC;
 }
+// タイマー復元で自動再開した場合、タップなしでは音が解禁されない（ブラウザの自動再生制限）。
+// そのため画面のどこかに触れた瞬間に音の準備・復帰を行う
+document.addEventListener("pointerdown", ()=>{ if(tRunning || AC) ac(); }, {passive:true});
 // 単音を鳴らす（周波数, 開始秒, 長さ, 波形, 音量係数, グライド先周波数）
 function tone(freq, start, dur, type="sine", vol=1, glide=null){
   const c = ac(), t0 = c.currentTime + start;
@@ -345,9 +353,9 @@ function tone(freq, start, dur, type="sine", vol=1, glide=null){
   o.type = type; o.frequency.setValueAtTime(freq, t0);
   if(glide) o.frequency.exponentialRampToValueAtTime(glide, t0+dur);
   g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(Math.max(0.001, S.vol*vol*0.5), t0+0.015);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, S.vol*vol*0.9), t0+0.015);
   g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-  o.connect(g); g.connect(c.destination);
+  o.connect(g); g.connect(COMP);
   o.start(t0); o.stop(t0+dur+0.05);
 }
 const SOUNDS = {
@@ -556,7 +564,7 @@ function tick(){
 async function requestWake(){ try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){} }
 function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock=null; }
 document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState==="visible" && tRunning) requestWake();
+  if(document.visibilityState==="visible" && tRunning){ requestWake(); ac(); }  // 復帰時に音も再開
 });
 
 /* ================= 履歴・集計 ================= */
