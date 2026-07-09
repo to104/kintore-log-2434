@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="筋トレ記録">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>筋トレ記録</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#151f33; --card2:#1c2942; --line:#2a3a5c;
+    --text:#e8eefc; --sub:#8fa3c8; --accent:#38bdf8; --accent2:#2563eb;
+    --green:#34d399; --red:#f87171; --amber:#fbbf24;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif; font-size:16px;}
+  body{padding-bottom:calc(64px + env(safe-area-inset-bottom));}
+  header{position:sticky; top:0; z-index:10; background:rgba(11,18,32,.92);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    padding:calc(10px + env(safe-area-inset-top)) 16px 10px; font-weight:700; font-size:18px;
+    border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+  header .date{font-size:13px; color:var(--sub); font-weight:500;}
+  main{padding:14px 14px 20px; max-width:520px; margin:0 auto;}
+  section{display:none;}
+  section.active{display:block;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .card h2{margin:0 0 10px; font-size:14px; color:var(--sub); font-weight:600; letter-spacing:.05em;}
+  label.field{display:block; font-size:13px; color:var(--sub); margin:10px 0 4px;}
+  select,input[type=text],input[type=number]{width:100%; background:var(--card2); color:var(--text);
+    border:1px solid var(--line); border-radius:10px; padding:12px; font-size:17px; appearance:none;}
+  .stepper{display:flex; gap:8px; align-items:center;}
+  .stepper input{text-align:center; font-size:22px; font-weight:700; flex:1; min-width:0;}
+  .stepper button{flex:0 0 64px;}
+  button{background:var(--card2); color:var(--text); border:1px solid var(--line);
+    border-radius:10px; padding:12px 10px; font-size:16px; font-weight:600; cursor:pointer;}
+  button:active{opacity:.7;}
+  button.primary{background:linear-gradient(135deg,var(--accent2),var(--accent)); border:none; color:#fff;}
+  button.big{width:100%; padding:16px; font-size:18px; border-radius:12px;}
+  button.danger{color:var(--red); border-color:#5c2a2a;}
+  button.ghost{background:transparent;}
+  .row{display:flex; gap:8px;}
+  .row>*{flex:1;}
+  /* ---- 今日の記録リスト ---- */
+  .exgroup{margin-bottom:10px;}
+  .exgroup .exname{font-weight:700; margin:6px 0 4px; color:var(--accent); font-size:15px;}
+  .setrow{display:flex; align-items:center; gap:8px; background:var(--card2);
+    border:1px solid var(--line); border-radius:10px; padding:9px 12px; margin-bottom:6px; font-size:15px;}
+  .setrow .no{color:var(--sub); font-size:13px; width:44px;}
+  .setrow .val{flex:1; font-weight:600;}
+  .setrow .del{background:none; border:none; color:var(--sub); font-size:18px; padding:2px 8px;}
+  .empty{color:var(--sub); font-size:14px; text-align:center; padding:14px 0;}
+  /* ---- タイマー ---- */
+  .timer-wrap{display:flex; flex-direction:column; align-items:center; padding:8px 0;}
+  .ring{position:relative; width:240px; height:240px;}
+  .ring svg{transform:rotate(-90deg);}
+  .ring .digits{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  .ring .digits .time{font-size:56px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.02em;}
+  .ring .digits .total{font-size:13px; color:var(--sub); margin-top:2px;}
+  .presets{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:14px 0 4px;}
+  .presets button{padding:9px 14px; font-size:15px; border-radius:20px;}
+  .presets button.sel{border-color:var(--accent); color:var(--accent);}
+  .adjust{display:flex; gap:10px; width:100%; margin:10px 0;}
+  .adjust button{flex:1; font-size:17px;}
+  .timer-main{display:flex; gap:10px; width:100%;}
+  .timer-main button{flex:2; padding:18px; font-size:20px; border-radius:14px;}
+  .timer-main button.reset{flex:1;}
+  .flash{position:fixed; inset:0; background:var(--accent); opacity:0; pointer-events:none; z-index:50; transition:opacity .15s;}
+  .flash.on{opacity:.55;}
+  /* ---- 履歴 ---- */
+  .stats{display:flex; gap:8px; margin-bottom:12px;}
+  .stat{flex:1; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center;}
+  .stat .v{font-size:20px; font-weight:800;}
+  .stat .k{font-size:11px; color:var(--sub); margin-top:2px;}
+  .daygroup{margin-bottom:14px;}
+  .daygroup .day{font-weight:700; font-size:14px; color:var(--sub); margin-bottom:6px;}
+  .chart{width:100%; height:170px; background:var(--card2); border:1px solid var(--line); border-radius:12px;}
+  /* ---- 設定 ---- */
+  .soundopt{display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line);}
+  .soundopt:last-child{border-bottom:none;}
+  .soundopt label{flex:1; font-size:16px;}
+  .soundopt input{width:22px; height:22px; accent-color:var(--accent);}
+  .soundopt .play{padding:8px 14px; font-size:14px;}
+  .toggle{display:flex; align-items:center; justify-content:space-between; padding:10px 4px;}
+  .toggle input{width:48px; height:28px; accent-color:var(--accent);}
+  input[type=range]{width:100%; accent-color:var(--accent);}
+  .exlist .setrow .val{font-weight:500;}
+  /* ---- 下部ナビ ---- */
+  nav{position:fixed; bottom:0; left:0; right:0; z-index:10; display:flex;
+    background:rgba(13,20,36,.95); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+    border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom);}
+  nav button{flex:1; background:none; border:none; border-radius:0; color:var(--sub);
+    padding:9px 0 7px; font-size:11px; display:flex; flex-direction:column; align-items:center; gap:3px;}
+  nav button .ico{font-size:21px; line-height:1;}
+  nav button.active{color:var(--accent);}
+  .note{font-size:12px; color:var(--sub); line-height:1.6; margin-top:8px;}
+</style>
+</head>
+<body>
+
+<header><span id="hdTitle">筋トレ記録</span><span class="date" id="hdDate"></span></header>
+<div class="flash" id="flash"></div>
+
+<main>
+
+  <!-- ========== 記録タブ ========== -->
+  <section id="tab-log" class="active">
+    <div class="card">
+      <h2>セットを記録</h2>
+      <label class="field">種目</label>
+      <select id="exSelect"></select>
+      <label class="field">重量（kg）　※自重は 0</label>
+      <div class="stepper">
+        <button onclick="stepW(-2.5)">−2.5</button>
+        <input type="number" id="inW" inputmode="decimal" step="0.5" value="20">
+        <button onclick="stepW(2.5)">＋2.5</button>
+      </div>
+      <label class="field">回数（レップ）</label>
+      <div class="stepper">
+        <button onclick="stepR(-1)">−1</button>
+        <input type="number" id="inR" inputmode="numeric" value="10">
+        <button onclick="stepR(1)">＋1</button>
+      </div>
+      <div style="height:14px"></div>
+      <button class="primary big" onclick="addSet()">セット完了 ✓</button>
+      <div class="note" id="autoTimerNote"></div>
+    </div>
+    <div class="card">
+      <h2>今日の記録</h2>
+      <div id="todayList"></div>
+    </div>
+  </section>
+
+  <!-- ========== タイマータブ ========== -->
+  <section id="tab-timer">
+    <div class="card timer-wrap">
+      <div class="ring">
+        <svg width="240" height="240" viewBox="0 0 240 240">
+          <circle cx="120" cy="120" r="106" fill="none" stroke="var(--line)" stroke-width="12"/>
+          <circle id="ringFg" cx="120" cy="120" r="106" fill="none" stroke="var(--accent)" stroke-width="12"
+                  stroke-linecap="round" stroke-dasharray="666" stroke-dashoffset="0"/>
+        </svg>
+        <div class="digits">
+          <div class="time" id="tDisp">1:30</div>
+          <div class="total" id="tTotalDisp">セット間の休憩</div>
+        </div>
+      </div>
+      <div class="presets" id="presets"></div>
+      <div class="adjust">
+        <button onclick="adjustTimer(-30)">−30秒</button>
+        <button onclick="adjustTimer(30)">＋30秒</button>
+      </div>
+      <div class="timer-main">
+        <button class="primary" id="btnStart" onclick="toggleTimer()">スタート</button>
+        <button class="reset" onclick="resetTimer()">リセット</button>
+      </div>
+      <div class="note">⏱ カウント中は画面が消灯しないようにします（音を鳴らすため、タイマー中は画面を点けたままにしてください）。</div>
+    </div>
+  </section>
+
+  <!-- ========== 履歴タブ ========== -->
+  <section id="tab-history">
+    <div class="card">
+      <h2>集計</h2>
+      <select id="histEx" onchange="renderHistory()"></select>
+      <div style="height:10px"></div>
+      <div class="stats" id="histStats"></div>
+      <svg class="chart" id="chart" viewBox="0 0 340 170" preserveAspectRatio="none"></svg>
+      <div class="note" id="chartNote"></div>
+    </div>
+    <div class="card">
+      <h2>記録一覧</h2>
+      <div id="histList"></div>
+    </div>
+    <div class="card">
+      <h2>データ書き出し</h2>
+      <div class="row">
+        <button onclick="exportCSV()">CSVを共有</button>
+        <button onclick="copyCSV()">CSVをコピー</button>
+      </div>
+      <div class="note">CSV（カンマ区切りデータ）をPCに送れば、Excelや Claude Code で自由に集計できます。</div>
+    </div>
+  </section>
+
+  <!-- ========== 設定タブ ========== -->
+  <section id="tab-settings">
+    <div class="card">
+      <h2>タイマー音</h2>
+      <div id="soundList"></div>
+      <label class="field">音量</label>
+      <input type="range" id="volSlider" min="0" max="1" step="0.05">
+    </div>
+    <div class="card">
+      <h2>タイマー動作</h2>
+      <div class="toggle">
+        <span>セット完了後に自動でタイマー開始</span>
+        <input type="checkbox" id="autoTimerChk">
+      </div>
+      <label class="field">デフォルトの休憩時間</label>
+      <div class="stepper">
+        <button onclick="stepRest(-30)">−30秒</button>
+        <input type="text" id="restDisp" readonly>
+        <button onclick="stepRest(30)">＋30秒</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>種目の管理</h2>
+      <div class="exlist" id="exList"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="newEx" placeholder="新しい種目名" style="flex:2">
+        <button onclick="addExercise()" style="flex:1">追加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>バックアップ</h2>
+      <div class="row">
+        <button onclick="backupJSON()">保存（JSON）</button>
+        <button onclick="document.getElementById('importFile').click()">復元</button>
+      </div>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+      <div style="height:10px"></div>
+      <button class="danger big" onclick="wipeAll()">全データを削除</button>
+      <div class="note">記録はこの端末のブラウザ内に保存されます。念のため月1回程度バックアップ（保存）をおすすめします。</div>
+    </div>
+  </section>
+
+</main>
+
+<nav>
+  <button data-tab="log" class="active"><span class="ico">📝</span>記録</button>
+  <button data-tab="timer"><span class="ico">⏱</span>タイマー</button>
+  <button data-tab="history"><span class="ico">📊</span>履歴</button>
+  <button data-tab="settings"><span class="ico">⚙️</span>設定</button>
+</nav>
+
+<script>
+"use strict";
+/* ================= データ保存 ================= */
+const LS_LOGS = "kt_logs", LS_SET = "kt_settings";
+const DEFAULT_EX = ["ベンチプレス","スクワット","デッドリフト","ショルダープレス","ラットプルダウン","ローイング","アームカール","レッグプレス","懸垂","腹筋"];
+let logs = load(LS_LOGS, []);                      // 全セット記録 [{ts,d,ex,w,r}]
+let S = Object.assign(
+  {sound:"beep", vol:0.7, autoTimer:true, rest:90, exercises:DEFAULT_EX.slice()},
+  load(LS_SET, {})
+);
+function load(k, fb){ try{ return JSON.parse(localStorage.getItem(k)) ?? fb; }catch(e){ return fb; } }
+function saveLogs(){ localStorage.setItem(LS_LOGS, JSON.stringify(logs)); }
+function saveSet(){ localStorage.setItem(LS_SET, JSON.stringify(S)); }
+function fmtDate(ts){ const d=new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function fmtTime(ts){ const d=new Date(ts); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+
+/* ================= タブ切替 ================= */
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=> showTab(b.dataset.tab));
+});
+function showTab(name){
+  document.querySelectorAll("section").forEach(s=> s.classList.toggle("active", s.id==="tab-"+name));
+  document.querySelectorAll("nav button").forEach(b=> b.classList.toggle("active", b.dataset.tab===name));
+  if(name==="history") renderHistory();
+}
+
+/* ================= 音（Web Audio APIで合成） ================= */
+let AC = null;
+function ac(){
+  if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==="suspended") AC.resume();
+  return AC;
+}
+// 単音を鳴らす（周波数, 開始秒, 長さ, 波形, 音量係数, グライド先周波数）
+function tone(freq, start, dur, type="sine", vol=1, glide=null){
+  const c = ac(), t0 = c.currentTime + start;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if(glide) o.frequency.exponentialRampToValueAtTime(glide, t0+dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001, S.vol*vol*0.5), t0+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0+dur+0.05);
+}
+const SOUNDS = {
+  beep:  {name:"電子ビープ（ピピピッ）", play(){ for(let i=0;i<3;i++) tone(880, i*0.18, 0.12, "square", .8); }},
+  chime: {name:"チャイム（ピンポーン）", play(){ tone(659,0,0.45,"sine",1); tone(523,0.4,0.9,"sine",1); }},
+  bell:  {name:"ベル（チーン）",         play(){ [0,0.5].forEach(s=>{ tone(1319,s,1.1,"sine",.9); tone(2637,s,0.55,"sine",.25); }); }},
+  alarm: {name:"アラーム（ビービー）",   play(){ for(let i=0;i<4;i++) tone(i%2?700:920, i*0.22, 0.18, "sawtooth", .55); }},
+  melody:{name:"メロディ（ピロリン）",   play(){ [523,659,784,1047].forEach((f,i)=> tone(f, i*0.13, 0.3, "triangle", .9)); }},
+};
+function playFinishSound(){
+  (SOUNDS[S.sound]||SOUNDS.beep).play();
+  setTimeout(()=> (SOUNDS[S.sound]||SOUNDS.beep).play(), 1400);   // 聞き逃し防止に2回鳴らす
+  const f = document.getElementById("flash");
+  f.classList.add("on"); setTimeout(()=> f.classList.remove("on"), 600);
+}
+function playTick(){ tone(1000, 0, 0.06, "sine", .4); }
+
+/* ================= 記録タブ ================= */
+function stepW(d){ const el=inW; el.value = Math.max(0, (parseFloat(el.value)||0)+d); }
+function stepR(d){ const el=inR; el.value = Math.max(1, (parseInt(el.value)||0)+d); }
+const inW = document.getElementById("inW"), inR = document.getElementById("inR");
+const exSelect = document.getElementById("exSelect");
+
+function renderExSelect(){
+  exSelect.innerHTML = S.exercises.map(e=>`<option>${esc(e)}</option>`).join("");
+}
+// 種目を切り替えたら、その種目の前回の重量・回数を自動入力
+exSelect.addEventListener("change", prefillLast);
+function prefillLast(){
+  const ex = exSelect.value;
+  for(let i=logs.length-1; i>=0; i--){
+    if(logs[i].ex===ex){ inW.value=logs[i].w; inR.value=logs[i].r; return; }
+  }
+}
+function addSet(){
+  const ex = exSelect.value;
+  if(!ex) return alert("種目を選択してください");
+  const w = parseFloat(inW.value)||0, r = parseInt(inR.value)||0;
+  if(r<1) return alert("回数を入力してください");
+  logs.push({ts:Date.now(), d:fmtDate(Date.now()), ex, w, r});
+  saveLogs(); renderToday();
+  if(S.autoTimer){ showTab("timer"); resetTimer(); toggleTimer(); }   // 自動で休憩タイマー開始
+}
+function delLog(ts){
+  logs = logs.filter(l=> l.ts!==ts);
+  saveLogs(); renderToday(); renderHistory();
+}
+function renderToday(){
+  const today = fmtDate(Date.now());
+  const list = logs.filter(l=> l.d===today);
+  const el = document.getElementById("todayList");
+  if(!list.length){ el.innerHTML = `<div class="empty">まだ記録がありません</div>`; return; }
+  const groups = {};
+  list.forEach(l=>{ (groups[l.ex] = groups[l.ex]||[]).push(l); });
+  el.innerHTML = Object.entries(groups).map(([ex,sets])=>`
+    <div class="exgroup"><div class="exname">${esc(ex)}</div>
+      ${sets.map((s,i)=>`
+        <div class="setrow">
+          <span class="no">${i+1}セット</span>
+          <span class="val">${s.w>0? s.w+" kg × ":"自重 × "}${s.r} 回</span>
+          <span class="no">${fmtTime(s.ts)}</span>
+          <button class="del" onclick="delLog(${s.ts})">✕</button>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
+/* ================= タイマー ================= */
+const RING_LEN = 666;   // 円周の長さ（進捗リング用）
+let tTotal = S.rest, tRemain = S.rest, tRunning = false, tEndAt = 0, tInterval = null, lastSec = null;
+let wakeLock = null;
+
+function fmtSec(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; }
+function renderPresets(){
+  const el = document.getElementById("presets");
+  el.innerHTML = [30,60,90,120,180].map(s=>
+    `<button class="${s===tTotal?"sel":""}" onclick="setTimerTo(${s})">${fmtSec(s)}</button>`).join("");
+}
+function drawTimer(){
+  document.getElementById("tDisp").textContent = fmtSec(Math.max(0,tRemain));
+  document.getElementById("tTotalDisp").textContent = tRunning ? `全体 ${fmtSec(tTotal)}` : "セット間の休憩";
+  const ratio = tTotal>0 ? tRemain/tTotal : 0;
+  document.getElementById("ringFg").style.strokeDashoffset = RING_LEN*(1-ratio);
+  document.getElementById("btnStart").textContent = tRunning ? "一時停止" : "スタート";
+}
+function setTimerTo(sec){ tTotal = tRemain = sec; stopTicking(); tRunning=false; renderPresets(); drawTimer(); }
+function adjustTimer(d){
+  tTotal = Math.max(30, tTotal + d);
+  tRemain = tRunning ? Math.max(0, tRemain + d) : tTotal;
+  if(tRunning) tEndAt = Date.now() + tRemain*1000;
+  renderPresets(); drawTimer();
+}
+function toggleTimer(){
+  ac();                                   // ユーザー操作時に音の準備（iOSの制約対策）
+  if(tRunning){ tRemain = Math.max(0, Math.round((tEndAt-Date.now())/1000)); stopTicking(); tRunning=false; }
+  else{
+    if(tRemain<=0) tRemain = tTotal;
+    tEndAt = Date.now() + tRemain*1000;
+    tRunning = true; lastSec = tRemain;
+    tInterval = setInterval(tick, 200);
+    requestWake();
+  }
+  drawTimer();
+}
+function resetTimer(){ stopTicking(); tRunning=false; tTotal = S.rest; tRemain = tTotal; renderPresets(); drawTimer(); }
+function stopTicking(){ if(tInterval){ clearInterval(tInterval); tInterval=null; } releaseWake(); }
+function tick(){
+  tRemain = Math.max(0, Math.round((tEndAt-Date.now())/1000));
+  if(tRemain !== lastSec){
+    lastSec = tRemain;
+    if(tRemain>0 && tRemain<=3) playTick();     // 残り3秒からカウント音
+  }
+  drawTimer();
+  if(tRemain<=0){ stopTicking(); tRunning=false; playFinishSound(); drawTimer(); }
+}
+// 画面消灯防止（Wake Lock。iOS 16.4以降のSafariで有効）
+async function requestWake(){ try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){} }
+function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch(e){} wakeLock=null; }
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && tRunning) requestWake();
+});
+
+/* ================= 履歴・集計 ================= */
+const histEx = document.getElementById("histEx");
+function renderHistExOptions(){
+  const used = [...new Set(logs.map(l=>l.ex))];
+  histEx.innerHTML = `<option value="">すべての種目</option>` + used.map(e=>`<option>${esc(e)}</option>`).join("");
+}
+function renderHistory(){
+  renderHistExOptions();
+  const sel = histEx.value;
+  const list = sel ? logs.filter(l=>l.ex===sel) : logs.slice();
+  // --- 統計 ---
+  const days = new Set(list.map(l=>l.d));
+  const maxW = list.length ? Math.max(...list.map(l=>l.w)) : 0;
+  const month = fmtDate(Date.now()).slice(0,7);
+  const volMonth = list.filter(l=>l.d.startsWith(month)).reduce((a,l)=>a+l.w*l.r, 0);
+  document.getElementById("histStats").innerHTML = `
+    <div class="stat"><div class="v">${days.size}</div><div class="k">トレ日数</div></div>
+    <div class="stat"><div class="v">${maxW}</div><div class="k">最大重量 kg</div></div>
+    <div class="stat"><div class="v">${Math.round(volMonth).toLocaleString()}</div><div class="k">今月の総挙上量 kg</div></div>`;
+  drawChart(list, sel);
+  // --- 日別リスト（新しい順） ---
+  const byDay = {};
+  list.forEach(l=>{ (byDay[l.d]=byDay[l.d]||[]).push(l); });
+  const el = document.getElementById("histList");
+  const dayKeys = Object.keys(byDay).sort().reverse();
+  if(!dayKeys.length){ el.innerHTML = `<div class="empty">記録がありません</div>`; return; }
+  el.innerHTML = dayKeys.slice(0,30).map(d=>{
+    const groups = {};
+    byDay[d].forEach(l=>{ (groups[l.ex]=groups[l.ex]||[]).push(l); });
+    return `<div class="daygroup"><div class="day">${d}</div>
+      ${Object.entries(groups).map(([ex,sets])=>`
+        <div class="setrow"><span class="val">${esc(ex)}</span>
+          <span style="color:var(--sub);font-size:13px">${sets.map(s=>(s.w>0?s.w+"kg":"自重")+"×"+s.r).join("　")}</span>
+        </div>`).join("")}
+    </div>`;
+  }).join("");
+}
+// 種目選択時：日ごとの最大重量の推移を折れ線で描画
+function drawChart(list, sel){
+  const svg = document.getElementById("chart"), note = document.getElementById("chartNote");
+  if(!sel){ svg.innerHTML=""; note.textContent="種目を選ぶと重量の推移グラフを表示します。"; return; }
+  const byDay = {};
+  list.forEach(l=>{ byDay[l.d] = Math.max(byDay[l.d]||0, l.w); });
+  const pts = Object.entries(byDay).sort().slice(-20);   // 直近20回分
+  if(pts.length<2){ svg.innerHTML=""; note.textContent="グラフは2日分以上の記録で表示されます。"; return; }
+  const ws = pts.map(p=>p[1]);
+  const min = Math.min(...ws), max = Math.max(...ws), span = (max-min)||1;
+  const X = i => 20 + i*(300/(pts.length-1));
+  const Y = w => 145 - (w-min)/span*115;
+  const path = pts.map((p,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+  svg.innerHTML = `
+    <text x="6" y="${Y(max)+4}" fill="var(--sub)" font-size="10">${max}</text>
+    <text x="6" y="${Y(min)+4}" fill="var(--sub)" font-size="10">${min}</text>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${pts.map((p,i)=>`<circle cx="${X(i)}" cy="${Y(p[1])}" r="3.5" fill="var(--accent)"/>`).join("")}`;
+  note.textContent = `${esc(sel)}：日別の最大重量（直近${pts.length}回）　${pts[0][0]} 〜 ${pts[pts.length-1][0]}`;
+}
+
+/* ================= CSV・バックアップ ================= */
+function buildCSV(){
+  const head = "﻿日付,時刻,種目,重量kg,回数\n";   // 先頭のBOMはExcelでの文字化け防止
+  return head + logs.map(l=>`${l.d},${fmtTime(l.ts)},${l.ex},${l.w},${l.r}`).join("\n");
+}
+async function exportCSV(){
+  const file = new File([buildCSV()], `筋トレ記録_${fmtDate(Date.now())}.csv`, {type:"text/csv"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:"筋トレ記録CSV"}); }catch(e){}
+  }else downloadBlob(file, file.name);
+}
+async function copyCSV(){
+  try{ await navigator.clipboard.writeText(buildCSV()); alert("CSVをコピーしました"); }
+  catch(e){ alert("コピーに失敗しました。「CSVを共有」をお試しください。"); }
+}
+function backupJSON(){
+  const data = JSON.stringify({logs, settings:S}, null, 1);
+  downloadBlob(new Blob([data],{type:"application/json"}), `筋トレバックアップ_${fmtDate(Date.now())}.json`);
+}
+function downloadBlob(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+}
+function importJSON(input){
+  const f = input.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const data = JSON.parse(rd.result);
+      if(!Array.isArray(data.logs)) throw 0;
+      if(!confirm(`${data.logs.length}件の記録を読み込み、現在のデータと置き換えます。よろしいですか？`)) return;
+      logs = data.logs; if(data.settings) S = Object.assign(S, data.settings);
+      saveLogs(); saveSet(); initUI();
+      alert("復元しました");
+    }catch(e){ alert("ファイルを読み込めませんでした。バックアップで保存したJSONファイルを選んでください。"); }
+  };
+  rd.readAsText(f);
+  input.value = "";
+}
+function wipeAll(){
+  if(!confirm("すべての記録と設定を削除します。よろしいですか？")) return;
+  if(!confirm("本当に削除しますか？（元に戻せません）")) return;
+  localStorage.removeItem(LS_LOGS); localStorage.removeItem(LS_SET);
+  location.reload();
+}
+
+/* ================= 設定タブ ================= */
+function renderSettings(){
+  document.getElementById("soundList").innerHTML = Object.entries(SOUNDS).map(([k,s])=>`
+    <div class="soundopt">
+      <input type="radio" name="snd" id="snd_${k}" ${S.sound===k?"checked":""} onchange="setSound('${k}')">
+      <label for="snd_${k}">${s.name}</label>
+      <button class="play" onclick="ac();SOUNDS['${k}'].play()">▶ 試聴</button>
+    </div>`).join("");
+  document.getElementById("volSlider").value = S.vol;
+  document.getElementById("autoTimerChk").checked = S.autoTimer;
+  document.getElementById("restDisp").value = fmtSec(S.rest);
+  document.getElementById("exList").innerHTML = S.exercises.map((e,i)=>`
+    <div class="setrow"><span class="val">${esc(e)}</span>
+      <button class="del" onclick="delExercise(${i})">✕</button></div>`).join("");
+  document.getElementById("autoTimerNote").textContent =
+    S.autoTimer ? `✓ セット完了後、自動で ${fmtSec(S.rest)} の休憩タイマーが始まります` : "";
+}
+function setSound(k){ S.sound=k; saveSet(); }
+document.getElementById("volSlider").addEventListener("change", e=>{
+  S.vol = parseFloat(e.target.value); saveSet(); ac(); SOUNDS[S.sound].play();
+});
+document.getElementById("autoTimerChk").addEventListener("change", e=>{
+  S.autoTimer = e.target.checked; saveSet(); renderSettings();
+});
+function stepRest(d){
+  S.rest = Math.max(30, S.rest+d); saveSet();
+  if(!tRunning){ tTotal=tRemain=S.rest; renderPresets(); drawTimer(); }
+  renderSettings();
+}
+function addExercise(){
+  const el = document.getElementById("newEx"), name = el.value.trim();
+  if(!name) return;
+  if(S.exercises.includes(name)) return alert("同じ種目がすでにあります");
+  S.exercises.push(name); saveSet(); el.value="";
+  renderExSelect(); renderSettings();
+}
+function delExercise(i){
+  if(!confirm(`「${S.exercises[i]}」を種目リストから削除しますか？（過去の記録は残ります）`)) return;
+  S.exercises.splice(i,1); saveSet(); renderExSelect(); renderSettings();
+}
+
+/* ================= 共通 ================= */
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function initUI(){
+  const now = new Date();
+  document.getElementById("hdDate").textContent =
+    `${now.getMonth()+1}/${now.getDate()}（${"日月火水木金土"[now.getDay()]}）`;
+  renderExSelect(); prefillLast(); renderToday();
+  tTotal = tRemain = S.rest; renderPresets(); drawTimer();
+  renderSettings();
+}
+initUI();
+
+/* ================= オフライン対応（Service Worker登録） ================= */
+if("serviceWorker" in navigator && location.protocol==="https:"){
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
