@@ -95,6 +95,14 @@
   .timer-main button.reset{flex:1;}
   .flash{position:fixed; inset:0; background:var(--accent); opacity:0; pointer-events:none; z-index:50; transition:opacity .15s;}
   .flash.on{opacity:.55;}
+  /* ---- 記録完了トースト（画面下からの通知表示） ---- */
+  .toast{position:fixed; left:50%; bottom:calc(90px + env(safe-area-inset-bottom));
+    transform:translate(-50%, 20px); background:var(--green); color:#06281c;
+    font-weight:700; font-size:16px; padding:12px 24px; border-radius:24px;
+    opacity:0; pointer-events:none; z-index:60; transition:all .25s;}
+  .toast.on{opacity:1; transform:translate(-50%, 0);}
+  /* バイブ発生用の隠しスイッチ（画面には見せない） */
+  .haptic-hidden{position:absolute; left:-9999px; width:1px; height:1px; opacity:0;}
   /* ---- 履歴 ---- */
   .stats{display:flex; gap:8px; margin-bottom:12px;}
   .stat{flex:1; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center;}
@@ -128,6 +136,9 @@
 
 <header><span id="hdTitle">筋トレ記録</span><span class="date" id="hdDate"></span></header>
 <div class="flash" id="flash"></div>
+<div class="toast" id="toast">✓ 記録しました</div>
+<!-- iPhoneでバイブ（触覚フィードバック）を鳴らすための隠しスイッチ -->
+<input type="checkbox" switch class="haptic-hidden" id="hapticSw" tabindex="-1" aria-hidden="true">
 
 <main>
 
@@ -338,12 +349,31 @@ const SOUNDS = {
   melody:{name:"メロディ（ピロリン）",   play(){ [523,659,784,1047].forEach((f,i)=> tone(f, i*0.13, 0.3, "triangle", .9)); }},
 };
 function playFinishSound(){
+  try{ if(navigator.vibrate) navigator.vibrate([300,150,300]); }catch(e){}
   (SOUNDS[S.sound]||SOUNDS.beep).play();
   setTimeout(()=> (SOUNDS[S.sound]||SOUNDS.beep).play(), 1400);   // 聞き逃し防止に2回鳴らす
   const f = document.getElementById("flash");
   f.classList.add("on"); setTimeout(()=> f.classList.remove("on"), 600);
 }
 function playTick(){ tone(1000, 0, 0.06, "sine", .4); }
+
+/* ================= バイブ・完了表示 ================= */
+// バイブを鳴らす。Androidは標準機能、iPhoneはスイッチ切替の触覚フィードバックを利用
+// （ボタンを押した直後＝ユーザー操作中しか動かない点に注意）
+function haptic(){
+  try{
+    if(navigator.vibrate) navigator.vibrate(80);
+    else document.getElementById("hapticSw").click();
+  }catch(e){}
+}
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove("on"), 1500);
+}
 
 /* ================= 記録する日（カレンダー） ================= */
 let selDate = fmtDate(Date.now());          // 記録対象の日付
@@ -433,6 +463,9 @@ function addSet(){
   }
   logs.push({ts, d:selDate, ex, w, r});
   saveLogs(); renderToday();
+  haptic();                                    // バイブで記録完了を通知
+  const setNo = logs.filter(l=> l.d===selDate && l.ex===ex).length;
+  showToast(`✓ ${ex} ${setNo}セット目を記録`);
   // 休憩タイマーの自動開始は「今日」への記録時のみ（過去日の入力時は不要）
   if(S.autoTimer && isToday(selDate)){ showTab("timer"); resetTimer(); toggleTimer(); }
 }

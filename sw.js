@@ -1,5 +1,5 @@
 // Service Worker：初回アクセス時にファイル一式を端末に保存し、以後オフラインで動かす
-const CACHE = "kintore-v2";
+const CACHE = "kintore-v3";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
